@@ -12,12 +12,13 @@
 
 char* getCommand();
 char** parseCommand(char* command);
+int execBuiltIn(char** args);
+
 
 int main(int argc, const char * argv[]) {
 
     char* args;
     char** parsedInput = NULL;
-    char* huh = NULL;
     int process = 0;
     args = getCommand();
     printf(args); //for testing
@@ -25,7 +26,7 @@ int main(int argc, const char * argv[]) {
     
     parsedInput = parseCommand(args);
     
-    huh = *parsedInput;
+    //print our args for testing, can be deleted later
     int i;
     int arrSize = sizeof(parsedInput);
     for(i = 0; i <= arrSize; i++){
@@ -33,6 +34,7 @@ int main(int argc, const char * argv[]) {
         
     }
     
+    //TODO: check for background run command
     
 }
 
