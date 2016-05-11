@@ -17,25 +17,47 @@ int execBuiltIn(char** args);
 
 int main(int argc, const char * argv[]) {
 
-    char* args;
-    char** parsedInput = NULL;
-    int process = 0;
-    args = getCommand();
-    printf(args); //for testing
-    printf("hi from main"); //for testing
+    int shellPrompt = 1;
+    do{
+        char* args;
+        char** parsedInput = NULL;
+        int process = 0;
+        args = getCommand();
+        printf(args); //for testing
+        printf("hi from main"); //for testing
+
+        parsedInput = parseCommand(args);
+
+    //    //print our args for testing, can be deleted later
+    //    int i;
+    //    int arrSize = sizeof(parsedInput);
+    //    for(i = 0; i <= arrSize; i++){
+    //        printf(parsedInput[i]);
+    //        
+    //    }
+
+        //TODO: check for background run command
+        shellPrompt = execBuiltIn(parsedInput);
+    }while(shellPrompt == 1);
+
     
-    parsedInput = parseCommand(args);
-    
-    //print our args for testing, can be deleted later
-    int i;
-    int arrSize = sizeof(parsedInput);
-    for(i = 0; i <= arrSize; i++){
-        printf(parsedInput[i]);
-        
+}
+
+int execBuiltIn(char** args){
+    printf("hello from built in");
+    //if user entered a comment
+    if(strcmp(args[0], "#") == 0)
+	{
+        	return 1;
     }
     
-    //TODO: check for background run command
     
+    if(strcmp(args[0], "exit") == 0)
+	{
+        	return 0;
+    }
+ 
+    return 1;
 }
 
 char* getCommand(){
