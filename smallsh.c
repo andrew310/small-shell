@@ -13,11 +13,13 @@
 
 char* getCommand();
 char** parseCommand(char* command);
-int execBuiltIn(char** args);
+int execBuiltIn(char** args, int* exitStatus);
 
 
 int main(int argc, const char * argv[]) {
 
+    int exitStatus = 0;
+    
     int shellPrompt = 1;
     do{
         char* args;
@@ -38,7 +40,10 @@ int main(int argc, const char * argv[]) {
     //    }
 
         //TODO: check for background run command
-        shellPrompt = execBuiltIn(parsedInput);
+        shellPrompt = execBuiltIn(parsedInput, &exitStatus);
+        //free up memory associated with the input
+        free(args);
+        free(parsedInput);
     }while(shellPrompt == 1);
 
     
@@ -48,7 +53,7 @@ int main(int argc, const char * argv[]) {
  * takes ptr to ptr of array containing parsed input from user
  * returns an int which will be used to determine if loop continues
  */
-int execBuiltIn(char** args){
+int execBuiltIn(char** args, int* exitStatus){
     printf("hello from built in");
     //if user entered a comment
     if(strcmp(args[0], "#") == 0){
@@ -57,6 +62,11 @@ int execBuiltIn(char** args){
     
     if(strcmp(args[0], "exit") == 0){
         	return 0;
+    }
+    
+    if(strcmp(args[0], "status") == 0){
+            printf("exit status: %d\n", *exitStatus);
+        	return 1;
     }
     
     if(strcmp(args[0], "cd") == 0){
@@ -81,6 +91,7 @@ char* getCommand(){
     char* input = malloc(sizeof(char*) * 2048);
     int arrSize = 2048;
 
+    printf(": ");
     fgets(input, arrSize, stdin);
     
     return input;
@@ -108,12 +119,10 @@ char** parseCommand(char* command){
     //start getting each block of chars delimited by spaces from the input command
     arg = strtok(arg, " ");
     //as long as there is still stuff to parse
-	while (arg != NULL) 
-	{
+	while (arg != NULL){
 		tokens[i] = arg;
 		i++;
 		arg = strtok(NULL, " ");
-	}
-    
+	} 
     return tokens;
 }
