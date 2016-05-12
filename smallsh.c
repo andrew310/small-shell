@@ -21,28 +21,6 @@ int execBuiltIn(char** args, int* exitStatus);
 int execForeign(char** args, int* exitStatus);
 int arrContainsString(char** arr, char* string);
 
-/* Function: arrContainsString
- * takes ann array to search, and a string to search for
- * returns 0 or 1 to specify if match was found
- * reference: http://stackoverflow.com/questions/13677890/how-to-check-if-a-string-is-in-an-array-of-strings-in-c
- */
-int arrContainsString(char** arr, char* string){
-    int i, length;
-    //calc length of our array
-    length = sizeof(arr) / sizeof(int);
-    //loop over array and compare to string
-    for(i = 0; i < length; i++){
-        if(strcmp(arr[i], string))
-        {
-            return i;
-        }
-    }
-    //if we made it this far, no match
-    return 0;
-}
-
-
-
 int main(int argc, const char * argv[]) {
 
     int exitStatus = 0;
@@ -69,43 +47,56 @@ int main(int argc, const char * argv[]) {
             shellPrompt = 1;
             //restart loop because we know user entered built in command
             continue;
+        } else {
+            //note: we shouldn't get here if the user entered a built in command
+            shellPrompt = execForeign(parsedInput, &exitStatus);
         }
-        //note: we shouldn't get here if the user entered a built in command
-
-        // i/o redirection args
-        else if(((strcmp(args[1], ">") == 0) || (strcmp(args[1], "<") == 0))){
-            //make temporary copy of file descriptors for stdin and stdout
-            //reference: http://stackoverflow.com/questions/4832603/how-could-i-temporary-redirect-stdout-to-a-file-in-a-c-program
-            int bak, new;
-            fflush(stdout);
-            bak = dup(1);
-            //3rd argument should contain the filename
-            new = open(args[2], O_WRONLY|O_CREAT|O_TRUNC, 0664);
-            //error handling for opening file
-            if(new == -1) {
-              printf("smallsh: no such file or directory");
-              fflush(stdout);
-              *exitStatus = 1;
-            }
-
-            dup2(new, 1);
-            close(new);
-            //code here...
-            fflush(stdout);
-            dup2(bak, 1);
-            close(bak);
-        }
-
-
-        int outputRedirect = arrContainsString(parsedInput, ">");
-        int inputRedirect = arrContainsString(parsedInput, "<");
-        printf("search array results: %d\n", outputRedirect);
 
         //free up memory associated with the input
         free(args);
         free(parsedInput);
 
     }while(shellPrompt == 1);
+}
+
+int execForeign(char** args, int* exitStatus){
+    // i/o redirection args
+    int outputRedirect = arrContainsString(args, ">");
+    int inputRedirect = arrContainsString(args, "<");
+    printf("search array results: %d\n", outputRedirect);
+
+    if (outputRedirect) {
+        /* code */
+    }
+    if (inputRedirect) {
+        /* code */
+    }
+
+    // else if(((strcmp(args[1], ">") == 0) || (strcmp(args[1], "<") == 0))){
+    //     //make temporary copy of file descriptors for stdin and stdout
+    //     //reference: http://stackoverflow.com/questions/4832603/how-could-i-temporary-redirect-stdout-to-a-file-in-a-c-program
+    //     int bak, new;
+    //     fflush(stdout);
+    //     bak = dup(1);
+    //     //3rd argument should contain the filename
+    //     new = open(args[2], O_WRONLY|O_CREAT|O_TRUNC, 0664);
+    //     //error handling for opening file
+    //     if(new == -1) {
+    //       printf("smallsh: no such file or directory");
+    //       fflush(stdout);
+    //       *exitStatus = 1;
+    //     }
+    //
+    //     dup2(new, 1);
+    //     close(new);
+    //     //code here...
+    //     fflush(stdout);
+    //     dup2(bak, 1);
+    //     close(bak);
+    // }
+
+    printf("hello from execforeign");
+    return 1;
 }
 
 /* Function: execBuiltIn
@@ -129,18 +120,17 @@ int execBuiltIn(char** args, int* exitStatus){
     }
 
     else if(strcmp(args[0], "cd") == 0){
-        if(args[1] == NULL)		{
+        if(args[1] == NULL){
     	        	char* path = getenv("HOME");
     	        	chdir(path);
     	   	} else {
        			char* path = args[1];
 	    		chdir(path);
        		}
-            //if we made it this far, none of the build in commands were typed
-        	return -1;
+        	return 1;
     }
-
-    return 1;
+    //if we made it this far, none of the build in commands were typed
+    return -1;
 }
 
 /* Function: getCommand()
@@ -169,8 +159,7 @@ char** parseCommand(char* command){
     arg = strtok(command, "\n");
 
     //if no commands were entered, return
-    if(arg == NULL)
-	{
+    if(arg == NULL){
 		tokens[0] = NULL;
 		return tokens;
 	}
@@ -185,4 +174,24 @@ char** parseCommand(char* command){
 		arg = strtok(NULL, " ");
 	}
     return tokens;
+}
+
+/* Function: arrContainsString
+ * takes ann array to search, and a string to search for
+ * returns 0 or 1 to specify if match was found
+ * reference: http://stackoverflow.com/questions/13677890/how-to-check-if-a-string-is-in-an-array-of-strings-in-c
+ */
+int arrContainsString(char** arr, char* string){
+    int i, length;
+    //calc length of our array
+    length = sizeof(arr) / sizeof(int);
+    //loop over array and compare to string
+    for(i = 0; i < length; i++){
+        if(strcmp(arr[i], string))
+        {
+            return i;
+        }
+    }
+    //if we made it this far, no match
+    return 0;
 }
