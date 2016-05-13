@@ -19,7 +19,7 @@ char* getCommand();
 char** parseCommand(char* command, int* argsNum);
 int execBuiltIn(char** args, int* exitStatus);
 int execForeign(char** args, int* exitStatus, int* length);
-int arrContainsString(char** arr, char* string);
+int arrContainsString(char** arr, char* string, int* length);
 
 int main(int argc, const char * argv[]) {
 
@@ -64,8 +64,8 @@ int main(int argc, const char * argv[]) {
 
 int execForeign(char** args, int* exitStatus, int* length){
     // i/o redirection args
-    int outputRedirect = arrContainsString(args, ">");
-    int inputRedirect = arrContainsString(args, "<");
+    int outputRedirect = arrContainsString(args, ">", length);
+    int inputRedirect = arrContainsString(args, "<", length);
     int fd;
     char* file;
 
@@ -80,14 +80,11 @@ int execForeign(char** args, int* exitStatus, int* length){
         file = args[inputRedirect + 1];
     }
     printf("length of ur array here we go: %d\n", *length);
-    // int i, length;
-    // //calc length of our array
-    // length = sizeof(args) / sizeof(char);
-    // printf("size of ur array once again: %s\n", length);
-    // //loop over array and compare to string
-    // for(i = 0; i < length; i++){
-    //     printf(args[i]);
-    // }
+    int i;
+    //loop over array and compare to string
+    for(i = 0; i < *length; i++){
+        printf(args[i]);
+    }
 
 
 
@@ -203,21 +200,15 @@ char** parseCommand(char* command, int* argsNum){
  * returns 0 or 1 to specify if match was found
  * reference: http://stackoverflow.com/questions/13677890/how-to-check-if-a-string-is-in-an-array-of-strings-in-c
  */
-int arrContainsString(char** arr, char* string){
-    int i, length;
-    //calc length of our array
-    length = sizeof(arr)/512;
-
-    printf("size of your array:%d\n", length);
+int arrContainsString(char** arr, char* string, int* length){
+    int i;
+    printf("size of your array:%d\n", *length);
 
 
     //loop over array and compare to string
-    for(i = 0; i < length; i++){
-        printf("length: &d\n", length);
-        printf("heres your stuff %s\n", arr[2]);
-        printf(string);
-        if(strcmp(arr[i], string))
-        {
+    for(i = 0; i < *length; i++){
+        printf("heres your stuff %s\n", arr[i]);
+        if(strcmp(arr[i], string)==0){
             //return the position in the array so we can find the file by adding 1
             return i;
         }
