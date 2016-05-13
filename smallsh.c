@@ -16,14 +16,15 @@
 #include <fcntl.h>
 
 char* getCommand();
-char** parseCommand(char* command);
+char** parseCommand(char* command, int* argsNum);
 int execBuiltIn(char** args, int* exitStatus);
-int execForeign(char** args, int* exitStatus);
+int execForeign(char** args, int* exitStatus, int* length);
 int arrContainsString(char** arr, char* string);
 
 int main(int argc, const char * argv[]) {
 
     int exitStatus = 0;
+    int argsNum = 0;
 
     int shellPrompt = 1;
     do{
@@ -32,9 +33,11 @@ int main(int argc, const char * argv[]) {
         int process = 0;
         args = getCommand();
         printf(args); //for testing
-        printf("hi from main"); //for testing
+        printf("hi from main\n"); //for testing
 
-        parsedInput = parseCommand(args);
+        parsedInput = parseCommand(args, &argsNum);
+
+        printf("number of args: %d\n", argsNum);
 
         //TODO: check for background run command
         int nativeCommand;
@@ -49,7 +52,7 @@ int main(int argc, const char * argv[]) {
             continue;
         } else {
             //note: we shouldn't get here if the user entered a built in command
-            shellPrompt = execForeign(parsedInput, &exitStatus);
+            shellPrompt = execForeign(parsedInput, &exitStatus, &argsNum);
         }
 
         //free up memory associated with the input
@@ -59,18 +62,34 @@ int main(int argc, const char * argv[]) {
     }while(shellPrompt == 1);
 }
 
-int execForeign(char** args, int* exitStatus){
+int execForeign(char** args, int* exitStatus, int* length){
     // i/o redirection args
     int outputRedirect = arrContainsString(args, ">");
     int inputRedirect = arrContainsString(args, "<");
+    int fd;
+    char* file;
+
     printf("search array results: %d\n", outputRedirect);
 
     if (outputRedirect) {
-        /* code */
+        //add 1 cause we returned the spot in the array where the > was
+        file = args[outputRedirect + 1];
+
     }
     if (inputRedirect) {
-        /* code */
+        file = args[inputRedirect + 1];
     }
+    printf("length of ur array here we go: %d\n", *length);
+    // int i, length;
+    // //calc length of our array
+    // length = sizeof(args) / sizeof(char);
+    // printf("size of ur array once again: %s\n", length);
+    // //loop over array and compare to string
+    // for(i = 0; i < length; i++){
+    //     printf(args[i]);
+    // }
+
+
 
     // else if(((strcmp(args[1], ">") == 0) || (strcmp(args[1], "<") == 0))){
     //     //make temporary copy of file descriptors for stdin and stdout
@@ -95,7 +114,7 @@ int execForeign(char** args, int* exitStatus){
     //     close(bak);
     // }
 
-    printf("hello from execforeign");
+    printf("hello from execforeign\n");
     return 1;
 }
 
@@ -104,7 +123,7 @@ int execForeign(char** args, int* exitStatus){
  * returns an int which will be used to determine if loop continues
  */
 int execBuiltIn(char** args, int* exitStatus){
-    printf("hello from built in");
+    printf("hello from built in\n");
     //if user entered a comment
     if(strcmp(args[0], "#") == 0){
         	return 1;
@@ -130,6 +149,7 @@ int execBuiltIn(char** args, int* exitStatus){
         	return 1;
     }
     //if we made it this far, none of the build in commands were typed
+    //returning -1 signifies to main that it was not a built in command
     return -1;
 }
 
@@ -151,7 +171,7 @@ char* getCommand(){
  * takes ptr to array containing raw input from user
  * returns ptr to parsed input (weeds out " " and \n, returns array commands)
  */
-char** parseCommand(char* command){
+char** parseCommand(char* command, int* argsNum){
     char** tokens = malloc(sizeof(char*) * 512);
     char* arg = NULL;
 
@@ -173,6 +193,8 @@ char** parseCommand(char* command){
 		i++;
 		arg = strtok(NULL, " ");
 	}
+    //store the number of arguments we got.
+    *argsNum = i;
     return tokens;
 }
 
@@ -184,14 +206,23 @@ char** parseCommand(char* command){
 int arrContainsString(char** arr, char* string){
     int i, length;
     //calc length of our array
-    length = sizeof(arr) / sizeof(int);
+    length = sizeof(arr)/512;
+
+    printf("size of your array:%d\n", length);
+
+
     //loop over array and compare to string
     for(i = 0; i < length; i++){
+        printf("length: &d\n", length);
+        printf("heres your stuff %s\n", arr[2]);
+        printf(string);
         if(strcmp(arr[i], string))
         {
+            //return the position in the array so we can find the file by adding 1
             return i;
         }
     }
     //if we made it this far, no match
+    //we can return 0 here because the < or > wouldn't be the first arg
     return 0;
 }
