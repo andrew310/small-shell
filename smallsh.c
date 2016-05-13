@@ -71,13 +71,15 @@ int execForeign(char** args, int* exitStatus, int* length){
 
     printf("search array results: %d\n", outputRedirect);
 
-    if (outputRedirect) {
-        //add 1 cause we returned the spot in the array where the > was
+    if (outputRedirect > 0) {
+        //add 1 b/c we returned the spot where the > is
         file = args[outputRedirect + 1];
-
+        fd = open(file, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+        printf("opened file: %s\n", args[outputRedirect]);
     }
-    if (inputRedirect) {
+    if (inputRedirect > 0) {
         file = args[inputRedirect + 1];
+        fd = open(file, O_WRONLY|O_TRUNC|O_CREAT, 0644);
     }
     printf("length of ur array here we go: %d\n", *length);
     int i;
@@ -202,12 +204,8 @@ char** parseCommand(char* command, int* argsNum){
  */
 int arrContainsString(char** arr, char* string, int* length){
     int i;
-    printf("size of your array:%d\n", *length);
-
-
     //loop over array and compare to string
     for(i = 0; i < *length; i++){
-        printf("heres your stuff %s\n", arr[i]);
         if(strcmp(arr[i], string)==0){
             //return the position in the array so we can find the file by adding 1
             return i;
