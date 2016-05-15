@@ -19,7 +19,7 @@
 
 char* getCommand();
 char** parseCommand(char* command, int* argsNum);
-int execBuiltIn(char** args, int* exitStatus);
+int execBuiltIn(char** args, int* exitStatus, int* length);
 int execForeign(char** args, int* exitStatus, int* length);
 int arrContainsString(char** arr, char* string, int* length);
 char** trim(char** arr, int* size);
@@ -50,13 +50,13 @@ int main(int argc, const char * argv[]) {
         //parse command returns tokenized args
         parsedInput = parseCommand(args, &argsNum);
 
-        printf("number of args: %d\n", argsNum);
+        //printf("number of args: %d\n", argsNum);
 
         //TODO: check for background run command
         //this will tell us if command was built in or not
         //I did it this way because we only need to run the execForeign if the command was not buil in
         int nativeCommand;
-        nativeCommand = execBuiltIn(parsedInput, &exitStatus);
+        nativeCommand = execBuiltIn(parsedInput, &exitStatus, &argsNum);
         if (nativeCommand == 1) {
             //user chose to exit
             shellPrompt = 1;
@@ -68,9 +68,12 @@ int main(int argc, const char * argv[]) {
         } else {
             //note: we shouldn't get here if the user entered a built in command
             exitStatus = execForeign(parsedInput, &exitStatus, &argsNum);
+            if (exitStatus != 0){
+                printf("smallsh: no such file or directory\n");
+            }
         }
 
-        printf("are we there yet: %d\n", shellPrompt);
+        //printf("are we there yet: %d\n", shellPrompt);
         //free up memory associated with the input
         free(args);
         free(parsedInput);
@@ -86,12 +89,25 @@ int execForeign(char** args, int* exitStatus, int* length){
     // i/o redirection args
     int outputRedirect = arrContainsString(args, ">", length);
     int inputRedirect = arrContainsString(args, "<", length);
+    int bgProcess = arrContainsString(args, "&", length);
+
+    //printf("background process: %d\n", bgProcess);
+    //printf("length of array: %d\n", *length);
+
     int fd = -1; //file descriptor for opening files
     char* file; //will hold filename
     char** trimmed = NULL; //will hold the input array after &, < and > are cut off
     pid_t childPid = -5; //process id for child created in fork
     struct sigaction act;
     int exitMethod, childStatus = 0;
+
+    //check for bgProcess
+    //remember arrContainsString returns position in the array
+    //so if the user put '&' last, then we need to run process in bg
+    //also i'm checking if length is greater than 1, cause if the user entered 1 arg it's pointless
+    if (bgProcess == *length-1 && *length > 1) {
+        bgProcess = 1; // at this point it's just a 0 or 1 binary
+    }
 
     //check for output redirect
     if (outputRedirect > 0) {
@@ -120,44 +136,69 @@ int execForeign(char** args, int* exitStatus, int* length){
             //reference: http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html
             //exit if unable to create output file
             if (outputRedirect > 0 && (dup2(fd, 1) < 0)) {
+                printf("smallsh: unable to open specified file: %s\n", file);
+                fflush(stdout);
                 _exit(1);
             }
             //if user chose input redirect, attempt open input file
             if (inputRedirect && (dup2(fd, 0) < 0)) {
                 printf("smallsh: unable to open specified file: %s\n", file);
+                fflush(stdout);
                 _exit(1);
             }
 
-            //user sig_dfl macro to user default, ie do not ignore signial interrupts
-            //this is because we are running in the foreground
-            //ref:http://www.gnu.org/software/libc/manual/html_node/Sigaction-Function-Example.html
-            act.sa_handler = SIG_DFL;
-            sigaction(SIGINT, &act, NULL);
+            //if we are running a foreground process
+            if (bgProcess ==0) {
+                //user sig_dfl macro to user default, ie do not ignore signial interrupts
+                //this is because we are running in the foreground
+                //ref:http://www.gnu.org/software/libc/manual/html_node/Sigaction-Function-Example.html
+                act.sa_handler = SIG_DFL;
+                act.sa_flags = 0;
+                sigaction(SIGINT, &act, NULL);
+            }
+
             //close file descriptor
             close(fd);
             //trim the user args array so that execvp wont try to execute <, > and &
             trimmed = trim(args, length);
 
+
             //will execute first argument and takes array of supporting arguments
             //DOES NOT RETURN
-            if (execvp(args[0], trimmed) == -1) {
+            exitMethod = execvp(args[0], trimmed);
+            if ( exitMethod == -1) {
                 //if we make it here, execvp failed bc the exec family functions do not return
                 printf("%s: no such file or directory\n", args[0]);
                 //exit with error
+                _exit(1);
+            } else if (exitMethod == 0) {
+                printf("not expecting return. Must be an execvp() error. \n");
                 _exit(1);
             }
                 break;
         default: // if fork > 0, this part is executed by parent process
             close(fd);
-            //we want the parent process to ignore signals for now
-            //cause if user hits ctrl + c right now, it should kill child not parent
-            act.sa_handler = SIG_IGN;
-            sigaction(SIGINT, &act, NULL);
 
-            //wait for child process to finish up
-            waitpid(childPid, &childStatus, WUNTRACED);
-            //set exit status
-            exitMethod = WEXITSTATUS(childStatus);
+            //if we are running a foreground command
+            if (bgProcess == 0) {
+                //we want the parent process to ignore signals for now
+                //cause if user hits ctrl + c right now, it should kill child not parent
+                act.sa_handler = SIG_DFL;
+                act.sa_handler = SIG_IGN;
+                sigaction(SIGINT, &act, NULL);
+
+                int result;
+                //wait for child process to finish up
+                result = waitpid(childPid, &childStatus, WUNTRACED);
+                if (result == -1) {
+                    perror ("waitpid");
+                    exit(1);
+                }
+
+                //set exit status
+                exitMethod = WEXITSTATUS(childStatus);
+            }
+
 
             // if (WIFSIGNALED(status)) {
             //     int sig = WTERMSIG(status);
@@ -168,10 +209,15 @@ int execForeign(char** args, int* exitStatus, int* length){
             break;
     }//end of case switch
 
-    //important to restore this because if user hits ctrl + c again, they want to exit the shell
-    act.sa_handler = SIG_DFL;
-    sigaction(SIGINT, &act, NULL);
     //code here executed by both
+
+    //if running foreground
+    if (bgProcess == 0) {
+        //important to restore this because if user hits ctrl + c again, they want to exit the shell
+        act.sa_handler = SIG_DFL;
+        sigaction(SIGINT, &act, NULL);
+    }
+    free(trimmed);
     return exitMethod;
 }
 
@@ -185,8 +231,9 @@ static void killZombies(int signal){
     int status;
     pid_t childPid;
 
-    while ((childPid = waitpid(-1, &status, WNOHANG)) >0) {
-        printf("killed chiled status: %s\n", childPid);
+    while ((childPid = waitpid(-1, &status, WNOHANG)) > 0){
+        char pidNumberStr[10];
+        snprintf(pidNumberStr, sizeof(pidNumberStr), "%d", childPid);
     }
 }
 
@@ -194,8 +241,7 @@ static void killZombies(int signal){
  * takes ptr to ptr of array containing parsed input from user
  * returns an int which will be used to determine if loop continues
  */
-int execBuiltIn(char** args, int* exitStatus){
-    printf("hello from built in\n");
+int execBuiltIn(char** args, int* exitStatus, int* length){
     //if user entered a comment
     if(strcmp(args[0], "#") == 0){
         	return 0;
@@ -211,13 +257,16 @@ int execBuiltIn(char** args, int* exitStatus){
     }
 
     else if(strcmp(args[0], "cd") == 0){
-        if(args[1] == NULL){
+        char** trimmed = NULL;
+        trimmed = trim(args, length);
+        if(trimmed[1] == NULL){
     	        	char* path = getenv("HOME");
     	        	chdir(path);
     	   	} else {
        			char* path = args[1];
 	    		chdir(path);
        		}
+            //free(trimmed);
         	return 0;
     }
     //if we made it this far, none of the build in commands were typed
@@ -230,6 +279,7 @@ int execBuiltIn(char** args, int* exitStatus){
  * returns ptr to an array which will contain raw input from user
  */
 char* getCommand(){
+    //stdin flush
     tcflush(0, TCIFLUSH);
 
     char* input = malloc(sizeof(char*) * 2048);
@@ -299,12 +349,11 @@ int arrContainsString(char** arr, char* string, int* length){
  */
 char** trim(char** arr, int* size){
     char** trimmed = malloc(sizeof(char*) * 512);
-
     int i = 0;
+    //we're just going to loop over the array until we hit anything we don't want execvp handling
     while (i < *size) {
         if ((strcmp(arr[i], "<") != 0) && (strcmp(arr[i], ">") != 0) && strcmp(arr[i], "&") != 0) {
             trimmed[i] = arr[i];
-            printf("I BE TRIMMIN: %s\n", trimmed[i]);
             i++;
             continue;
         }
