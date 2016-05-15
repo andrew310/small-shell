@@ -23,26 +23,38 @@ int execBuiltIn(char** args, int* exitStatus);
 int execForeign(char** args, int* exitStatus, int* length);
 int arrContainsString(char** arr, char* string, int* length);
 char** trim(char** arr, int* size);
+static void killZombies(int signal);
 
 int main(int argc, const char * argv[]) {
 
     int exitStatus = 0;
     int argsNum = 0;
-
     int shellPrompt = 0;
+
+    //set up to kill zombies
+    struct sigaction act;
+    act.sa_handler = killZombies;
+    act.sa_flags = 0;
+    sigaction(SIGCHLD, &act, NULL);
+
+    //main loop
     do{
+        //variables to hold input
         char* args;
         char** parsedInput = NULL;
         int process = 0;
 
+        //get command returns raw input from user
         args = getCommand();
 
-
+        //parse command returns tokenized args
         parsedInput = parseCommand(args, &argsNum);
 
         printf("number of args: %d\n", argsNum);
 
         //TODO: check for background run command
+        //this will tell us if command was built in or not
+        //I did it this way because we only need to run the execForeign if the command was not buil in
         int nativeCommand;
         nativeCommand = execBuiltIn(parsedInput, &exitStatus);
         if (nativeCommand == 1) {
@@ -66,38 +78,33 @@ int main(int argc, const char * argv[]) {
     }while(shellPrompt == 0);
 }
 
+/* Function: execforeign
+ * takes array of args, pointer to status, pointer to length of args array
+ * executes non built in commands and returns status
+ */
 int execForeign(char** args, int* exitStatus, int* length){
     // i/o redirection args
     int outputRedirect = arrContainsString(args, ">", length);
     int inputRedirect = arrContainsString(args, "<", length);
-    int fd = -1;
-    char* file;
-    char** trimmed = NULL;
-    pid_t childPid = -5;
+    int fd = -1; //file descriptor for opening files
+    char* file; //will hold filename
+    char** trimmed = NULL; //will hold the input array after &, < and > are cut off
+    pid_t childPid = -5; //process id for child created in fork
     struct sigaction act;
     int exitMethod, childStatus = 0;
 
-    //printf("search array results: %d\n", outputRedirect);
-
+    //check for output redirect
     if (outputRedirect > 0) {
         //add 1 b/c we returned the spot where the > is
         file = args[outputRedirect + 1];
         fd = open(file, O_WRONLY|O_TRUNC|O_CREAT, 0644);
         //printf("opened file: %s\n", args[outputRedirect+1]);
     }
+    //check for input redirect
     if (inputRedirect > 0) {
         file = args[inputRedirect + 1];
         fd = open(file, O_RDONLY, 0644);
     }
-
-    //printf("input redirect: %d\n", inputRedirect);
-
-    // printf("length of ur array here we go: %d\n", *length);
-    // int i;
-    // //loop over array and compare to string
-    // for(i = 0; i < *length; i++){
-    //     printf(args[i]);
-    // }
 
     //create child process
     childPid = fork();
@@ -115,7 +122,7 @@ int execForeign(char** args, int* exitStatus, int* length){
             if (outputRedirect > 0 && (dup2(fd, 1) < 0)) {
                 _exit(1);
             }
-
+            //if user chose input redirect, attempt open input file
             if (inputRedirect && (dup2(fd, 0) < 0)) {
                 printf("smallsh: unable to open specified file: %s\n", file);
                 _exit(1);
@@ -126,11 +133,10 @@ int execForeign(char** args, int* exitStatus, int* length){
             //ref:http://www.gnu.org/software/libc/manual/html_node/Sigaction-Function-Example.html
             act.sa_handler = SIG_DFL;
             sigaction(SIGINT, &act, NULL);
-
+            //close file descriptor
             close(fd);
-
+            //trim the user args array so that execvp wont try to execute <, > and &
             trimmed = trim(args, length);
-
 
             //will execute first argument and takes array of supporting arguments
             //DOES NOT RETURN
@@ -143,15 +149,14 @@ int execForeign(char** args, int* exitStatus, int* length){
                 break;
         default: // if fork > 0, this part is executed by parent process
             close(fd);
-
-            //we want the parent process to ignore signals
-            act.sa_handler = SIG_DFL;
+            //we want the parent process to ignore signals for now
+            //cause if user hits ctrl + c right now, it should kill child not parent
             act.sa_handler = SIG_IGN;
             sigaction(SIGINT, &act, NULL);
 
             //wait for child process to finish up
-            waitpid(childPid, &childStatus, 0);
-
+            waitpid(childPid, &childStatus, WUNTRACED);
+            //set exit status
             exitMethod = WEXITSTATUS(childStatus);
 
             // if (WIFSIGNALED(status)) {
@@ -163,8 +168,26 @@ int execForeign(char** args, int* exitStatus, int* length){
             break;
     }//end of case switch
 
+    //important to restore this because if user hits ctrl + c again, they want to exit the shell
+    act.sa_handler = SIG_DFL;
+    sigaction(SIGINT, &act, NULL);
     //code here executed by both
     return exitMethod;
+}
+
+
+/*Function: killZombies
+ * takes in int which is the signal
+ * used for when child process is running in background
+ * ref: http://voyager.deanza.edu/~perry/sigchld.html
+ */
+static void killZombies(int signal){
+    int status;
+    pid_t childPid;
+
+    while ((childPid = waitpid(-1, &status, WNOHANG)) >0) {
+        printf("killed chiled status: %s\n", childPid);
+    }
 }
 
 /* Function: execBuiltIn
