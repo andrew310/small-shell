@@ -229,12 +229,44 @@ int execForeign(char** args, int* exitStatus, int* length){
  */
 static void killZombies(int signal){
     int status;
-    pid_t childPid;
+	pid_t childPid;
 
-    while ((childPid = waitpid(-1, &status, WNOHANG)) > 0){
-        char pidNumberStr[10];
-        snprintf(pidNumberStr, sizeof(pidNumberStr), "%d", childPid);
-    }
+	//Loop will continue as long as there are children to reap
+    //http://stackoverflow.com/questions/11322488/how-to-make-sure-that-waitpid-1-stat-wnohang-collect-all-children-process
+	while ((childPid = waitpid(-1, &status, WNOHANG)) > 0)
+	{
+		//copy the childPid to a string so we can concatenate to an output msg
+		char childPidStr[10];
+		snprintf(childPidStr, sizeof(childPidStr), "%d", childPid);
+        //use same steps to create a message for finished bg processes
+		char bgMessage[80];
+		strncpy(bgMessage, "\nbackground process ", 80);
+		strcat(bgMessage, childPidStr);
+		strcat(bgMessage, " finished, ");
+
+		//detect interupt signals
+		if(WIFSIGNALED(status)) {
+			int signalNumber = WTERMSIG(status);
+			char signalNumberStr[10];
+   			snprintf(signalNumberStr, sizeof(signalNumberStr), "%d", signalNumber);
+			strcat(bgMessage, "terminated by signal: ");
+			strcat(bgMessage, signalNumberStr);
+			strcat(bgMessage, "\n");
+            //use write instead of printf: http://stackoverflow.com/questions/14647468/about-fork-and-printf-write
+			write(1, bgMessage, sizeof(bgMessage));
+		}
+        //if the process ended normally
+		else
+		{
+			char statusNumberStr[5];
+			strcat(bgMessage, "exit value: ");
+			snprintf(statusNumberStr, sizeof(statusNumberStr), "%d", WEXITSTATUS(status));
+			strcat(bgMessage, statusNumberStr);
+			strcat(bgMessage, "\n");
+			write(1, bgMessage, sizeof(bgMessage));
+		}
+		continue;
+	}
 }
 
 /* Function: execBuiltIn
