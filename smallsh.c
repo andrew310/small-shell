@@ -179,6 +179,12 @@ int execForeign(char** args, int* exitStatus, int* length){
         default: // if fork > 0, this part is executed by parent process
             close(fd);
 
+            //print id of bg process
+            if (bgProcess == 1) {
+                printf("background process: %d\n", childPid);
+            }
+
+
             //if we are running a foreground command
             if (bgProcess == 0) {
                 //we want the parent process to ignore signals for now
@@ -198,13 +204,6 @@ int execForeign(char** args, int* exitStatus, int* length){
                 //set exit status
                 exitMethod = WEXITSTATUS(childStatus);
             }
-
-
-            // if (WIFSIGNALED(status)) {
-            //     int sig = WTERMSIG(status);
-            //     char errMsg[50];
-            //     char si
-            // }
 
             break;
     }//end of case switch
@@ -238,7 +237,7 @@ static void killZombies(int signal){
 		//copy the childPid to a string so we can concatenate to an output msg
 		char childPidStr[10];
 		snprintf(childPidStr, sizeof(childPidStr), "%d", childPid);
-        //use same steps to create a message for finished bg processes
+        //concatenate the child pid to a message for outputting
 		char bgMessage[80];
 		strncpy(bgMessage, "\nbackground process ", 80);
 		strcat(bgMessage, childPidStr);
@@ -252,7 +251,6 @@ static void killZombies(int signal){
 			strcat(bgMessage, "terminated by signal: ");
 			strcat(bgMessage, signalNumberStr);
 			strcat(bgMessage, "\n");
-            //use write instead of printf: http://stackoverflow.com/questions/14647468/about-fork-and-printf-write
 			write(1, bgMessage, sizeof(bgMessage));
 		}
         //if the process ended normally
